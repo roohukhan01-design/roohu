@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Roohu</title>
+<style>
+:root{--bg:#03060b;--s1:#0a1019;--s2:#101927;--bd:#16293d;--tx:#e8f5ff;--mu:#6f8aa3;--c:#3ddcff;--a:#8b7bff;--bad:#ff5c7a;--ok:#3dffc8;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--tx);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden}
+#app{height:100%;display:flex;flex-direction:column;max-width:560px;margin:auto;padding:0 18px}
+header{display:flex;align-items:center;justify-content:space-between;padding:10px 0}
+.wm{display:flex;align-items:center;gap:10px;font:600 13px ui-monospace,monospace;letter-spacing:.32em;color:var(--tx)}
+.wm i{width:8px;height:8px;border-radius:50%;background:var(--mu)}.wm.ok i{background:var(--ok);box-shadow:0 0 10px var(--ok)}.wm.bad i{background:var(--bad)}
+.hb{display:flex;gap:6px}
+.ic{width:38px;height:38px;border-radius:50%;border:0;background:none;color:var(--c);font-size:17px}
+.ic.off{color:var(--mu);text-decoration:line-through}
+#hud{flex:none;display:flex;flex-direction:column;align-items:center}
+#stt{font:11px ui-monospace,monospace;letter-spacing:.3em;color:var(--c);margin-top:-6px;opacity:.8}
+#chat{flex:1;overflow-y:auto;padding:22px 0 8px;display:flex;flex-direction:column;gap:14px;-webkit-mask-image:linear-gradient(transparent,#000 46px);mask-image:linear-gradient(transparent,#000 46px)}
+.m{animation:in .3s;max-width:92%}
+.m.a{font-size:18px;line-height:1.4;color:var(--tx)}
+.m.u{align-self:flex-end;color:var(--mu);font-size:14px}
+.bt{display:flex;gap:8px;margin-top:12px}
+@keyframes in{from{opacity:0;transform:translateY(8px)}}
+#bar{flex:none;padding:6px 0 16px}
+.chs{display:flex;gap:8px;overflow-x:auto;padding-bottom:10px;scrollbar-width:none}
+.chs:empty{display:none}
+.ch{white-space:nowrap;padding:7px 14px;border:1px solid var(--bd);border-radius:20px;font-size:13px;color:var(--c)}
+.in{display:flex;gap:8px;align-items:center;background:var(--s1);border:1px solid var(--bd);border-radius:28px;padding:5px 5px 5px 18px;transition:box-shadow .3s}
+.in:focus-within{box-shadow:0 0 28px #3ddcff30;border-color:#2a5a78}
+.in input{flex:1;min-width:0;background:none;border:0;color:var(--tx);font:inherit;outline:0}
+.btn{border:0;border-radius:12px;padding:11px 16px;font:600 14px system-ui;color:#04121c;background:var(--c);text-decoration:none;display:inline-block;text-align:center}
+.btn.g{background:var(--s2);color:var(--tx);border:1px solid var(--bd)}
+.go{width:44px;height:44px;border-radius:50%;border:0;background:var(--c);color:#04121c;font:700 20px system-ui}
+.stop{display:none;height:44px;border-radius:22px;border:0;background:var(--bad);color:#fff;font:700 15px system-ui;padding:0 22px}
+.sh{position:fixed;inset:0;background:var(--bg);transform:translateY(100%);transition:transform .35s;overflow:auto;z-index:5;padding:calc(14px + env(safe-area-inset-top,0px)) 18px calc(30px + env(safe-area-inset-bottom,0px))}
+.sh.on{transform:none}.sh>div{max-width:560px;margin:auto}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+h2{font-size:20px;margin:0}h3{font-size:15px;margin:0 0 8px}
+.cd{background:var(--s1);border:1px solid var(--bd);border-radius:16px;padding:16px;margin:0 0 14px}
+.mu{color:var(--mu)}.sm{font-size:13px}.xs{font-size:12px}
+label{font-size:13px;color:var(--mu)}
+.cd input:not([type=checkbox]),.cd select,.cd textarea{width:100%;background:var(--s2);color:var(--tx);border:1px solid var(--bd);border-radius:12px;padding:11px;font:inherit;margin:4px 0 10px}
+.row{display:flex;gap:10px}.row>*{flex:1}
+.rt{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--bd);font-size:14px}
+.rt button{background:none;border:0;color:var(--bad);font-size:13px}
+#sp{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;z-index:9;transition:opacity .8s}
+.o{width:100px;height:100px;border-radius:50%;border:3px solid transparent;border-top-color:var(--c);border-right-color:var(--a);animation:sp 1s linear infinite;position:relative}
+.o:after{content:"";position:absolute;inset:14px;border-radius:50%;border:3px solid transparent;border-bottom-color:var(--a);border-left-color:var(--c);animation:sp 1.5s linear infinite reverse}
+@keyframes sp{to{transform:rotate(360deg)}}
+#bt2{font:12px ui-monospace,monospace;color:var(--c);letter-spacing:.25em;height:18px}
+@media (prefers-reduced-motion:reduce){.o,.o:after{animation-duration:8s}}
+</style></head><body>
+<div id="sp"><div class="o"></div><div id="bt2">STARTING CORE</div></div>
+<div id="app">
+<header><div class="wm" id="st"><i></i>ROOHU</div>
+<div class="hb"><button class="ic" id="vb" aria-label="Voice replies">♪</button><button class="ic" id="sb" aria-label="Settings">✦</button></div></header>
+<div id="hud"><canvas id="orb"></canvas><div id="stt">STANDING BY</div></div>
+<div id="chat"></div>
+<div id="bar"><div class="chs" id="rts"></div>
+<div class="in"><input id="cmd" placeholder="Talk to Roohu" enterkeyhint="send" autocomplete="off"><button class="go" id="go" aria-label="Send">↑</button><button class="stop" id="stop">STOP</button></div></div>
+</div>
+
+<div class="sh" id="set"><div><div class="top"><h2>Settings</h2><button class="btn g" id="x">Close</button></div>
+<div class="cd"><h3>Brain</h3>
+<p class="mu sm">Add a free cloud AI so Roohu understands plain words.</p>
+<label for="ap">Provider</label>
+<select id="ap"><option value="or">OpenRouter</option><option value="gr">Groq</option><option value="ge">Google Gemini</option><option value="cu">Other (OpenAI-compatible)</option></select>
+<label for="ab">Base URL</label><input id="ab" autocapitalize="off" spellcheck="false">
+<label for="ak">API key</label><input id="ak" type="password" autocomplete="off" placeholder="paste your key">
+<label for="am">Model</label><input id="am" autocapitalize="off" spellcheck="false" placeholder="model name">
+<select id="ml" style="display:none"></select>
+<div class="row"><button class="btn g" id="aL">Load free models</button><button class="btn g" id="aT">Test</button></div>
+<button class="btn" id="aS" style="width:100%;margin-top:12px">Save</button>
+<p id="am2" class="sm" style="color:var(--c)"></p>
+<label style="display:flex;gap:10px;align-items:flex-start;color:var(--tx)"><input type="checkbox" id="sa" style="margin-top:5px"><span>Screen-aware mode<br><span class="mu xs">Roohu looks at the words on your screen and decides each step. The visible screen text is sent to your AI provider. Off by default.</span></span></label>
+<p class="mu xs">Your key stays on this phone. Free plans have limits and model names change.</p></div>
+<div class="cd"><h3>Routines</h3><p class="mu sm">Save a name for a set of commands. Say the name to run it.</p>
+<input id="rn" placeholder="Name, like morning" autocapitalize="off"><textarea id="rc" rows="2" placeholder="open Chrome, then wait 3, then scroll down"></textarea>
+<button class="btn g" id="rs" style="width:100%">Save routine</button><div id="rl"></div></div>
+<div class="cd"><label style="display:flex;gap:10px;align-items:center;color:var(--tx)"><input type="checkbox" id="sn"> Soft sounds</label></div>
+<div class="xs mu" style="padding:6px 2px 0"><b style="color:var(--tx)">About Roohu</b> · Version 1.3.0 · Developer: Roohu · Support: roohukhan01@gmail.com
+<br>Privacy: Commands run on your phone. If you use a cloud AI, the text you write (and the screen text, if screen-aware mode is on) goes to that provider.
+<div class="row" style="margin-top:10px"><a class="btn g" href="mailto:roohukhan01@gmail.com">Contact support</a><button class="btn g" id="cp">Copy email</button></div>
+<div style="margin-top:12px">© 2026 Roohu. All rights reserved.</div></div></div></div>
+<script>
+const $=s=>document.querySelector(s);
+const sv=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
+const ld=k=>{try{return localStorage.getItem(k)}catch(e){return null}};
+//<P>
+function parseCommand(text){
+  const parts=text.split(/\s*(?:,\s*)?\b(?:and then|then)\b\s*|\s*[;\n]\s*/i).map(s=>s.trim().replace(/^[,\s]+|[,.\s]+$/g,'')).filter(Boolean);
+  const steps=[];const q=s=>s.replace(/^["'“”‘’]+|["'“”‘’]+$/g,'').trim();
+  for(const p of parts){let m;
+    if(m=p.match(/^(?:open|launch|start)\s+(.+)$/i))steps.push({a:'open',t:q(m[1])});
+    else if(m=p.match(/^(?:tap|click|press|touch|select)\s+(?:on\s+)?(.+)$/i))steps.push({a:'tap',t:q(m[1])});
+    else if(m=p.match(/^(?:type|write|enter)\s+(.+)$/i))steps.push({a:'type',t:q(m[1])});
+    else if(m=p.match(/^scroll(?:\s+(up|down))?$/i))steps.push({a:'scroll',t:(m[1]||'down').toLowerCase()});
+    else if(/^(?:go\s+)?back$/i.test(p))steps.push({a:'back',t:''});
+    else if(/^(?:go\s+)?home$/i.test(p))steps.push({a:'home',t:''});
+    else if(m=p.match(/^wait(?:\s+(\d+))?$/i))steps.push({a:'wait',t:String(Math.min(10,+m[1]||2))});
+    else if(/^(?:(?:read|look)(?:\s+(?:at\s+)?(?:the\s+)?screen)?|what(?:['’]s|\s+is)\s+on\s+(?:my\s+|the\s+)?screen\??)$/i.test(p))steps.push({a:'read',t:''});
+    else return {err:'I do not know this step: "'+p+'".'};
+  }
+  if(!steps.length)return {err:'Write a command first.'};
+  if(steps.length>20)return {err:'Maximum is 20 steps.'};
+  if(!['open','home','wait'].includes(steps[0].a))steps.unshift({a:'wait',t:'5'});
+  return {steps};
+}
+function cleanPlan(raw){
+  const s=String(raw).replace(/```json|```/gi,'');const i=s.indexOf('{'),k=s.lastIndexOf('}');
+  if(i<0||k<i)return {err:'The AI did not return steps.'};
+  let o;try{o=JSON.parse(s.slice(i,k+1))}catch(e){return {err:'The AI answer was not valid.'}}
+  const A=['open','tap','type','scroll','back','home','wait','read'];
+  const steps=(Array.isArray(o.steps)?o.steps:[]).slice(0,20).filter(x=>x&&A.includes(x.a)).map(x=>{
+    let t=String(x.t==null?'':x.t).slice(0,80);
+    if(x.a=='scroll')t=t=='up'?'up':'down';
+    if(x.a=='wait')t=String(Math.min(10,Math.max(1,parseInt(t)||2)));
+    if(['back','home','read'].includes(x.a))t='';
+    return {a:x.a,t}}).filter(x=>!['open','tap','type'].includes(x.a)||x.t);
+  if(!steps.length)return {err:'The AI gave no usable steps.'};
+  if(!['open','home','wait'].includes(steps[0].a))steps.unshift({a:'wait',t:'5'});
+  return {steps};
+}
+function sayStep(s){const t=s.t;return({open:'Opening '+t,tap:'Tapping '+t,type:'Typing "'+t+'"',scroll:'Scrolling '+t,back:'Going back',home:'Going home',read:'Reading the screen',wait:'Waiting '+t+' seconds'})[s.a]||s.a}
+function findRoutine(R,t){const k=Object.keys(R).find(n=>n.toLowerCase()==t.trim().toLowerCase());return k?R[k]:null}
+//</P>
+const SYS='You control an Android phone with simple steps. Answer with JSON only, no other text: {"steps":[{"a":"open","t":"App name"}]}. Allowed a: open (t = app name), tap (t = visible button text), type (t = text), scroll (t = up or down), back, home, wait (t = seconds), read. Use at most 12 steps. Use common English button names. Never use banking, payment or password apps. If the task is not possible, return {"steps":[]}.';
+const PV={or:['https://openrouter.ai/api/v1',''],gr:['https://api.groq.com/openai/v1','llama-3.3-70b-versatile'],ge:['https://generativelanguage.googleapis.com/v1beta/openai','gemini-2.5-flash'],cu:['','']};
+function cfg(){try{return JSON.parse(ld('ai')||'{}')}catch(e){return {}}}
+async function ask(c,user){
+  const ac=new AbortController();const to=setTimeout(()=>ac.abort(),30000);
+  try{const r=await fetch(c.base.replace(/\/$/,'')+'/chat/completions',{method:'POST',signal:ac.signal,headers:{'Content-Type':'application/json','Authorization':'Bearer '+c.key},
+    body:JSON.stringify({model:c.model,temperature:0,max_tokens:500,messages:[{role:'system',content:SYS},{role:'user',content:user}]})});
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(String((j.error&&(j.error.message||j.error))||'HTTP '+r.status).slice(0,140));
+    return (j.choices&&j.choices[0]&&j.choices[0].message.content)||''}
+  finally{clearTimeout(to)}
+}
+function mock(){const st={running:false,log:[],screen:[{text:'Wi-Fi'},{text:'Bluetooth'},{text:'Search settings'}]};
+return{isEnabled:async()=>({enabled:true}),openSettings:async()=>{},stop:async()=>{st.running=false;st.log.push('Stopped.')},
+status:async()=>({status:JSON.stringify(st)}),
+run:async({plan})=>{const s=JSON.parse(plan);st.running=true;st.log=[];let i=0;
+const nx=()=>{if(!st.running)return;if(i<s.length){st.log.push((i+1)+'. '+s[i].a+' '+s[i].t,'   ok');if(s[i].a=='read')st.log.push('   ok, saw 3 items');i++;setTimeout(nx,800)}else{st.log.push('Finished.');st.running=false}};nx()}}}
+let Agent=null,tm,seen=0,first=true,state='idle',said=false,kick=0;
+try{const C=window.Capacitor;
+if(C&&typeof C.registerPlugin==='function'&&C.isNativePlatform&&C.isNativePlatform())Agent=C.registerPlugin('Agent');
+else if(C&&typeof C.nativePromise==='function'){Agent={};['isEnabled','openSettings','run','runAgent','status','stop'].forEach(m=>{Agent[m]=o=>C.nativePromise('Agent',m,o||{})})}
+}catch(e){}
+const preview=!Agent;if(preview)Agent=mock();
+const mk=(tag,cls,txt)=>{const e=document.createElement(tag);if(cls)e.className=cls;e.textContent=txt;return e};
+const LB={idle:'STANDING BY',think:'THINKING',act:'WORKING',speak:'SPEAKING',err:'PROBLEM'};
+function setState(s){state=s;$('#stt').textContent=LB[s]}
+let voice=ld('voice')!=='0';
+const syncV=()=>$('#vb').classList.toggle('off',!voice);
+function speak(t){if(!voice||!window.speechSynthesis)return;try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.onstart=()=>{if(state=='idle')setState('speak')};u.onend=()=>{if(state=='speak')setState('idle')};speechSynthesis.speak(u)}catch(e){}}
+let AC=null;function beep(f){if(ld('sound')!=='1')return;try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();const o=AC.createOscillator(),g=AC.createGain();o.frequency.value=f;g.gain.value=.04;o.connect(g);g.connect(AC.destination);o.start();g.gain.exponentialRampToValueAtTime(.0001,AC.currentTime+.18);o.stop(AC.currentTime+.2)}catch(e){}}
+const sc=()=>{const c=$('#chat');c.scrollTop=c.scrollHeight};
+function msg(r,t,o={}){const c=$('#chat');while(c.children.length>40)c.firstChild.remove();
+  const m=mk('div','m '+r,'');const b=mk('span','','');m.append(b);c.append(m);
+  if(r=='a'&&t.length<200){let i=0;const iv=setInterval(()=>{b.textContent=t.slice(0,++i);sc();if(i>=t.length)clearInterval(iv)},14)}else b.textContent=t;
+  if(o.btns){const d=mk('div','bt','');o.btns.forEach(([l,f])=>{const x=mk('button','btn'+(l=='Cancel'?' g':''),l);x.onclick=()=>{d.remove();f()};d.append(x)});m.append(d)}
+  sc();if(r=='a'&&!o.quiet)speak(t)}
+function narr(l,r){let m;
+  if(m=l.match(/^\d+\.\s+(\w+)\s?(.*)$/)){if(m[1]!='wait')msg('a',sayStep({a:m[1],t:m[2]}),{quiet:1})}
+  else if(l.startsWith('SAY ')){said=true;msg('a',l.slice(4))}
+  else if(l.startsWith('   ok, saw')){const w=(r.screen||[]).slice(0,10).map(x=>x.text).join(', ');msg('a','I can see: '+(w||'nothing I can read')+'.')}
+  else if(l.startsWith('   FAIL')){setState('err');msg('a','I could not do that: '+l.replace(/^\s*FAIL:?\s*/,'')+'.')}
+  else if(l=='Finished.'){beep(880);if(!said)msg('a','Done.')}
+  else if(l=='Stopped.')msg('a','Stopped.');
+  else if(l.startsWith('STOPPED'))msg('a','I stopped. This looks like a password or money screen.');
+  else if(l.startsWith('Not allowed'))msg('a','Okay, I did not do it.')}
+async function poll(){clearTimeout(tm);try{const r=JSON.parse((await Agent.status()).status);const L=r.log||[];
+  if(first){seen=L.length;first=false}if(L.length<seen)seen=0;
+  for(;seen<L.length;seen++)narr(L[seen],r);
+  if(r.running){setState('act');tm=setTimeout(poll,700)}else if(state=='act'||state=='err')setState('idle');
+  $('#go').style.display=r.running?'none':'';$('#stop').style.display=r.running?'block':'none'}catch(e){}}
+let warned=false;
+async function chk(){try{const e=(await Agent.isEnabled()).enabled;
+  $('#st').className='wm '+(preview?'':e?'ok':'bad');
+  if(!preview&&!e&&!warned){warned=true;msg('a','My hands are off. Turn on my accessibility service. If the switch is grey, open App info and allow restricted settings first.',{btns:[['Turn on',()=>Agent.openSettings()]]})}}catch(e){}}
+async function begin(fn,quietMsg){seen=0;first=false;said=false;
+  try{await fn();beep(520);setState('act');if(quietMsg)msg('a',quietMsg,{quiet:1});poll()}
+  catch(e){setState('err');msg('a','I could not start: '+(e.message||e))}}
+const exec=steps=>begin(()=>Agent.run({plan:JSON.stringify(steps)}),steps[0].a=='wait'&&steps[0].t=='5'?'You have 5 seconds. Open the app you want me to use.':(preview?'Demo mode. Nothing real happens.':''));
+const rt=()=>{try{return JSON.parse(ld('rt')||'{}')}catch(e){return{}}};
+async function submit(t,depth){t=(t||$('#cmd').value).trim();if(!t)return;$('#cmd').value='';if(!depth)msg('u',t);beep(660);
+  const rc=findRoutine(rt(),t);if(rc&&!depth&&rc!==t)return submit(rc,1);
+  const p=parseCommand(t);if(!p.err)return exec(p.steps);
+  const c=cfg();if(!c.key||!c.model||!c.base)return msg('a','I only know exact commands for now, like "open Chrome, then scroll down". Add a brain in settings (✦) and I will understand plain words.');
+  if(ld('sa')==='1'&&!preview)return begin(()=>Agent.runAgent({goal:t,base:c.base,key:c.key,model:c.model}),'On it.');
+  setState('think');
+  try{const q=cleanPlan(await ask(c,t));setState('idle');if(q.err)return msg('a',q.err);
+    msg('a','My plan: '+q.steps.filter(s=>s.a!='wait').map(sayStep).join(', then ').toLowerCase()+'.',{btns:[['Run it',()=>exec(q.steps)],['Cancel',()=>msg('a','Cancelled.')]]})}
+  catch(e){setState('err');msg('a','I could not reach the AI: '+(e.name=='AbortError'?'it took too long':(e.message||e)))}}
+function drawR(){const R=rt(),n=Object.keys(R);const L=$('#rl'),P=$('#rts');L.textContent='';P.textContent='';
+  n.forEach(k=>{const c=mk('span','ch',k);c.onclick=()=>submit(R[k],1);P.append(c);
+    const d=mk('div','rt','');d.append(mk('span','',k));const x=mk('button','','Delete');x.onclick=()=>{delete R[k];sv('rt',JSON.stringify(R));drawR()};d.append(x);L.append(d)})}
+$('#rs').onclick=()=>{const n=$('#rn').value.trim(),c=$('#rc').value.trim();if(!n||!c)return;const p=parseCommand(c);if(p.err)return alert(p.err);const R=rt();R[n]=c;sv('rt',JSON.stringify(R));$('#rn').value=$('#rc').value='';drawR()};
+drawR();
+$('#go').onclick=()=>submit();
+$('#cmd').addEventListener('keydown',e=>{if(e.key=='Enter'){e.preventDefault();submit()}});
+$('#cmd').addEventListener('input',()=>{kick=1});
+$('#stop').onclick=async()=>{await Agent.stop();poll()};
+$('#vb').onclick=()=>{voice=!voice;sv('voice',voice?'1':'0');syncV();if(!voice&&window.speechSynthesis)speechSynthesis.cancel()};syncV();
+$('#sb').onclick=()=>$('#set').classList.add('on');$('#x').onclick=()=>$('#set').classList.remove('on');
+$('#cp').onclick=async()=>{try{await navigator.clipboard.writeText('roohukhan01@gmail.com');$('#cp').textContent='Copied'}catch(e){$('#cp').textContent='Copy failed'}};
+$('#sn').checked=ld('sound')==='1';$('#sn').onchange=()=>{sv('sound',$('#sn').checked?'1':'0');beep(700)};
+$('#sa').checked=ld('sa')==='1';$('#sa').onchange=()=>sv('sa',$('#sa').checked?'1':'0');
+const note=t=>{$('#am2').textContent=t};
+(function(){const c=cfg();$('#ap').value=c.p||'or';$('#ab').value=c.base||PV[c.p||'or'][0];$('#ak').value=c.key||'';$('#am').value=c.model||''})();
+$('#ap').onchange=()=>{const v=PV[$('#ap').value];$('#ab').value=v[0];$('#am').value=v[1];$('#ml').style.display='none'};
+$('#ml').onchange=()=>{$('#am').value=$('#ml').value};
+const cur=()=>({p:$('#ap').value,base:$('#ab').value.trim(),key:$('#ak').value.trim(),model:$('#am').value.trim()});
+$('#aS').onclick=()=>{sv('ai',JSON.stringify(cur()));note('Saved on this phone.')};
+$('#aL').onclick=async()=>{note('Loading…');try{const r=await fetch('https://openrouter.ai/api/v1/models');const j=await r.json();
+  const ids=j.data.map(m=>m.id).filter(i=>i.endsWith(':free')).sort();if(!ids.length)return note('No free models found.');
+  const s=$('#ml');s.textContent='';ids.forEach(i=>{const o=document.createElement('option');o.value=o.textContent=i;s.append(o)});s.style.display='block';$('#am').value=ids[0];note(ids.length+' free models. Pick one above.')}
+  catch(e){note('Could not load: '+(e.message||e))}};
+$('#aT').onclick=async()=>{const c=cur();if(!c.key||!c.model||!c.base)return note('Fill base URL, key and model first.');note('Testing…');
+  try{const q=cleanPlan(await ask(c,'open Settings'));note(q.err?'Connected, but: '+q.err:'Works. The AI answered with a plan.')}catch(e){note('Failed: '+(e.name=='AbortError'?'too slow':(e.message||e)))}};
+/* orb */
+const cv=$('#orb'),g=cv.getContext('2d'),R0=window.devicePixelRatio||1;let D=300;
+function fit(){D=Math.max(200,Math.min(380,innerWidth*.92,innerHeight*.42));cv.style.width=cv.style.height=D+'px';cv.width=cv.height=D*R0}
+fit();addEventListener('resize',fit);
+const COL={idle:[61,220,255],think:[139,123,255],act:[255,184,77],speak:[61,255,200],err:[255,92,122]};let cc=[61,220,255],tt=0;
+const slow=matchMedia('(prefers-reduced-motion:reduce)').matches?.3:1;
+const PT=Array.from({length:40},()=>({a:Math.random()*6.283,r:.2+Math.random()*.28,s:(Math.random()-.5)*.4,z:.6+Math.random()*1.6}));
+function draw(){requestAnimationFrame(draw);tt+=.016;kick*=.94;const c=COL[state];for(let i=0;i<3;i++)cc[i]+=(c[i]-cc[i])*.08;
+  const sp=({idle:.25,think:1.6,act:1,speak:.7,err:.1})[state]*slow+kick*1.2,am=({idle:.04,think:.12,act:.1,speak:.2,err:.02})[state]+kick*.1;
+  const rgb=cc.map(Math.round).join(',');g.setTransform(R0,0,0,R0,0,0);g.clearRect(0,0,D,D);const x=D/2,col='rgb('+rgb+')';
+  let gr=g.createRadialGradient(x,x,0,x,x,D/2);gr.addColorStop(0,'rgba('+rgb+',.38)');gr.addColorStop(.55,'rgba('+rgb+',.07)');gr.addColorStop(1,'rgba(0,0,0,0)');g.fillStyle=gr;g.fillRect(0,0,D,D);
+  g.fillStyle=col;PT.forEach(p=>{p.a+=p.s*.01*(1+sp);g.globalAlpha=.5;g.beginPath();g.arc(x+Math.cos(p.a)*D*p.r*1.7,x+Math.sin(p.a)*D*p.r*1.7,p.z,0,6.283);g.fill()});
+  g.strokeStyle=col;g.lineCap='round';
+  [[.46,2,[2,10],1],[.38,3,[40,14],-1.3],[.31,2,[6,6],2]].forEach(([r,w,d,k],i)=>{g.save();g.translate(x,x);g.rotate(tt*sp*k);g.lineWidth=w;g.setLineDash(d);g.globalAlpha=.85-i*.15;g.beginPath();g.arc(0,0,D*r,0,6.283);g.stroke();g.restore()});
+  g.save();g.translate(x,x);g.lineWidth=2;g.setLineDash([]);g.globalAlpha=1;
+  for(let i=0;i<72;i++){const a=i/72*6.283,n=Math.sin(tt*3*sp+i*.7)*Math.sin(tt*1.3+i*.21),l=D*(.02+am*.6*(.5+.5*n)),s0=D*.16;g.beginPath();g.moveTo(Math.cos(a)*s0,Math.sin(a)*s0);g.lineTo(Math.cos(a)*(s0+l),Math.sin(a)*(s0+l));g.stroke()}
+  g.restore();const p=1+Math.sin(tt*(2+sp*3))*.07,rr=D*.13*p;g.globalAlpha=1;
+  gr=g.createRadialGradient(x,x,0,x,x,rr);gr.addColorStop(0,'#fff');gr.addColorStop(.4,col);gr.addColorStop(1,'rgba(0,0,0,0)');g.fillStyle=gr;g.beginPath();g.arc(x,x,rr,0,6.283);g.fill()}
+draw();
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){chk();poll()}});
+const BL=['STARTING CORE','LINKING HANDS','CHECKING SAFETY','ONLINE'];let bi=0;
+const bv=setInterval(()=>{$('#bt2').textContent=BL[Math.min(++bi,3)]},520);
+setTimeout(()=>{clearInterval(bv);$('#sp').style.opacity=0;setTimeout(()=>$('#sp').remove(),800);
+  const h=new Date().getHours();msg('a',(h<12?'Good morning.':h<18?'Good afternoon.':'Good evening.')+' Roohu is online.',{quiet:1});beep(440);chk();poll()},2200);
+</script></body></html>
