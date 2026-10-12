@@ -1,0 +1,54 @@
+name: Build Roohu APK
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Put files in place
+        run: |
+          mkdir -p www assets
+          cp index.html www/
+          cp icon-only.png icon-foreground.png icon-background.png splash.png splash-dark.png assets/
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - run: npm install
+      - run: npx cap add android
+      - name: Add Android code
+        run: |
+          cp MainActivity.java AgentPlugin.java AgentAccessibilityService.java android/app/src/main/java/com/roohu/phoneagent/
+          mkdir -p android/app/src/main/res/xml
+          cat > android/app/src/main/res/xml/accessibility_service_config.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+            android:accessibilityEventTypes="typeWindowStateChanged"
+            android:accessibilityFeedbackType="feedbackGeneric"
+            android:accessibilityFlags="flagIncludeNotImportantViews|flagRetrieveInteractiveWindows"
+            android:canRetrieveWindowContent="true"
+            android:canPerformGestures="true"
+            android:notificationTimeout="100"
+            android:description="@string/agent_desc" />
+          EOF
+          sed -i 's#</resources>#<string name="agent_desc">Roohu runs commands you give. It stops on password and money screens.</string></resources>#' android/app/src/main/res/values/strings.xml
+          M=android/app/src/main/AndroidManifest.xml
+          sed -i 's#<application#<queries><intent><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent></queries><application#' $M
+          sed -i 's#</application>#<service android:name=".AgentAccessibilityService" android:exported="true" android:label="@string/app_name" android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"><intent-filter><action android:name="android.accessibilityservice.AccessibilityService"/></intent-filter><meta-data android:name="android.accessibilityservice" android:resource="@xml/accessibility_service_config"/></service></application>#' $M
+      - run: npx capacitor-assets generate --android
+      - run: npx cap sync android
+      - name: Build APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Roohu-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
