@@ -27,6 +27,11 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLEncoder;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import android.content.SharedPreferences;
+import android.os.Build;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -51,11 +56,13 @@ public class AgentAccessibilityService extends AccessibilityService {
     protected void onServiceConnected() {
         instance = this;
         wm = (WindowManager) getSystemService(WINDOW_SERVICE);
+        if (getSharedPreferences("roohu", MODE_PRIVATE).getBoolean("bot", false)) launchBot();
     }
 
     @Override
     public boolean onUnbind(Intent i) {
         instance = null;
+        botOn = false;
         return super.onUnbind(i);
     }
 
@@ -76,6 +83,8 @@ public class AgentAccessibilityService extends AccessibilityService {
             o.put("running", running);
             o.put("log", new JSONArray(log));
             o.put("screen", new JSONArray(lastScreen));
+            o.put("bot", botOn);
+            o.put("paired", getSharedPreferences("roohu", MODE_PRIVATE).getLong("paired", 0) != 0);
             return o.toString();
         } catch (Exception e) {
             return "{}";
@@ -266,6 +275,7 @@ public class AgentAccessibilityService extends AccessibilityService {
     }
 
     private String step(String a, String t) throws InterruptedException {
+        if ((a.equals("open") || a.equals("tap")) && t.trim().equalsIgnoreCase("roohu")) return "FAIL: that is me";
         switch (a) {
             case "open":
                 for (String b : BLOCK) if (t.toLowerCase(Locale.ROOT).contains(b)) return "FAIL: money apps are blocked";
@@ -279,6 +289,7 @@ public class AgentAccessibilityService extends AccessibilityService {
                 int s = Math.min(10, Math.max(1, Integer.parseInt(t.isEmpty() ? "2" : t)));
                 Thread.sleep(s * 1000L);
                 return "ok";
+            case "enter": return pressEnter() ? "ok" : "FAIL: could not press enter (needs Android 11 or newer)";
             case "read": return "ok, saw " + readScreen() + " items (see Screen tab)";
             default: return "FAIL: unknown step";
         }
@@ -322,7 +333,7 @@ public class AgentAccessibilityService extends AccessibilityService {
         return true;
     }
 
-    private static final String AGENT_SYS = "You control an Android phone. Each turn you get the goal, what was already done, and the visible screen items. Reply with ONE JSON object only. To act: {\"a\":\"open|tap|type|scroll|back|home|wait\",\"t\":\"...\"} (open: app name; tap: exact visible text; type: text; scroll: up or down; wait: seconds). When finished or impossible: {\"done\":true,\"say\":\"short message\"}. Never touch banking, payment or password screens.";
+    private static final String AGENT_SYS = "You control an Android phone. Each turn you get the goal, what was already done, and the visible screen items. Reply with ONE JSON object only. To act: {\"a\":\"open|tap|type|scroll|back|home|enter|wait\",\"t\":\"...\"} (open: app name; tap: exact visible text; type: text; scroll: up or down; wait: seconds). When finished or impossible: {\"done\":true,\"say\":\"short message\"}. Never touch banking, payment or password screens. Never open or tap the app named Roohu. If the goal is only a question or chat, reply {\"done\":true,\"say\":\"your short answer\"}.";
 
     private String chat(String base, String key, String model, String sys, String user) throws Exception {
         HttpURLConnection c = (HttpURLConnection) new URL(base.replaceAll("/+$", "") + "/chat/completions").openConnection();
@@ -378,7 +389,7 @@ public class AgentAccessibilityService extends AccessibilityService {
                     readScreen();
                     String out = chat(base, key, model, AGENT_SYS, "Goal: " + goal + "\nDone so far: " + hist + "\nScreen items: " + lastScreen);
                     JSONObject o = parseObj(out);
-                    if (o == null) { addLog("   FAIL: I did not understand the AI answer"); break; }
+                    if (o == null) { String w = out.trim(); addLog("SAY " + w.substring(0, Math.min(300, w.length()))); break; }
                     if (o.optBoolean("done", false)) { addLog("SAY " + o.optString("say", "Done.")); break; }
                     String a = o.optString("a");
                     String t = o.optString("t");
@@ -398,5 +409,173 @@ public class AgentAccessibilityService extends AccessibilityService {
         });
         worker.start();
         return true;
+    }
+
+    private boolean pressEnter() {
+        if (Build.VERSION.SDK_INT < 30) return false;
+        AccessibilityNodeInfo r = getRootInActiveWindow();
+        if (r == null) return false;
+        AccessibilityNodeInfo f = r.findFocus(AccessibilityNodeInfo.FOCUS_INPUT);
+        return f != null && f.performAction(android.R.id.accessibilityActionImeEnter);
+    }
+
+    private volatile boolean botOn = false;
+    private volatile int botGen = 0;
+
+    private Matcher mt(String re, String s) {
+        Matcher m = Pattern.compile(re, Pattern.CASE_INSENSITIVE).matcher(s);
+        return m.matches() ? m : null;
+    }
+
+    private void add(JSONArray out, String a, String t) {
+        try {
+            out.put(new JSONObject().put("a", a).put("t", t.trim().replaceAll("^[\"'\u201c\u201d]+|[\"'\u201c\u201d]+$", "")));
+        } catch (Exception e) { }
+    }
+
+    private void search(JSONArray out, String app, String q) {
+        if (app != null) { add(out, "open", app); add(out, "wait", "3"); }
+        add(out, "tap", "search");
+        add(out, "wait", "1");
+        add(out, "type", q);
+        add(out, "enter", "");
+    }
+
+    private JSONArray parseCmd(String text) {
+        JSONArray out = new JSONArray();
+        for (String raw : text.split("(?i)\\s*(?:,\\s*)?\\b(?:and then|then)\\b\\s*|\\s*[;\\n]\\s*")) {
+            String p = raw.trim().replaceAll("^[,\\s]+|[,.\\s]+$", "");
+            if (p.isEmpty()) continue;
+            Matcher m;
+            if ((m = mt("(?:open|launch|start)\\s+(.+?)\\s+(?:and\\s+)?(?:search|find)(?:\\s+for)?\\s+(.+)", p)) != null) search(out, m.group(1), m.group(2));
+            else if ((m = mt("(?:search|find)(?:\\s+for)?\\s+(.+?)\\s+(?:in|on)\\s+(.+)", p)) != null) search(out, m.group(2), m.group(1));
+            else if ((m = mt("(?:search|find)(?:\\s+for)?\\s+(.+)", p)) != null) search(out, null, m.group(1));
+            else if ((m = mt("(?:open|launch|start)\\s+(.+)", p)) != null) add(out, "open", m.group(1));
+            else if ((m = mt("(?:tap|click|press|touch|select)\\s+(?:on\\s+)?(.+)", p)) != null) add(out, "tap", m.group(1));
+            else if (mt("(?:press\\s+)?enter", p) != null) add(out, "enter", "");
+            else if ((m = mt("(?:type|write|enter)\\s+(.+)", p)) != null) add(out, "type", m.group(1));
+            else if ((m = mt("scroll(?:\\s+(up|down))?", p)) != null) add(out, "scroll", m.group(1) == null ? "down" : m.group(1).toLowerCase(Locale.ROOT));
+            else if (mt("(?:go\\s+)?back", p) != null) add(out, "back", "");
+            else if (mt("(?:go\\s+)?home", p) != null) add(out, "home", "");
+            else if ((m = mt("wait(?:\\s+(\\d+))?", p)) != null) add(out, "wait", m.group(1) == null ? "2" : m.group(1));
+            else if (mt("(?:read|look)(?:\\s+(?:at\\s+)?(?:the\\s+)?screen)?|what(?:'s|\\s+is)\\s+on\\s+(?:my\\s+|the\\s+)?screen\\??", p) != null) add(out, "read", "");
+            else return null;
+        }
+        return out;
+    }
+
+    private String http(String method, String url, String body) throws Exception {
+        HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+        c.setRequestMethod(method);
+        c.setConnectTimeout(15000);
+        c.setReadTimeout(40000);
+        if (body != null) {
+            c.setDoOutput(true);
+            c.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+            OutputStream o = c.getOutputStream();
+            o.write(body.getBytes("UTF-8"));
+            o.close();
+        }
+        InputStream is = c.getResponseCode() < 400 ? c.getInputStream() : c.getErrorStream();
+        ByteArrayOutputStream bo = new ByteArrayOutputStream();
+        byte[] buf = new byte[4096];
+        int n;
+        while ((n = is.read(buf)) > 0) bo.write(buf, 0, n);
+        return bo.toString("UTF-8");
+    }
+
+    private void tgSend(String token, long chat, String text) {
+        try {
+            if (text.length() > 3500) text = text.substring(0, 3500);
+            http("POST", "https://api.telegram.org/bot" + token + "/sendMessage", "chat_id=" + chat + "&text=" + URLEncoder.encode(text, "UTF-8"));
+        } catch (Exception e) { }
+    }
+
+    private synchronized String summary() {
+        StringBuilder b = new StringBuilder();
+        for (String l : log) b.append(l.startsWith("SAY ") ? l.substring(4) : l.trim()).append('\n');
+        return b.length() == 0 ? "Done." : b.toString();
+    }
+
+    private void botHandle(String token, long chat, String text) throws Exception {
+        SharedPreferences sp = getSharedPreferences("roohu", MODE_PRIVATE);
+        long paired = sp.getLong("paired", 0);
+        String code = sp.getString("code", "");
+        if (text.startsWith("/pair ")) {
+            if (paired == 0 && !code.isEmpty() && text.substring(6).trim().equals(code)) {
+                sp.edit().putLong("paired", chat).putString("code", "").apply();
+                tgSend(token, chat, "Paired. I am Roohu. Send a command, /screen, /stop or /help.");
+            }
+            return;
+        }
+        if (paired == 0 || chat != paired) return;
+        String tl = text.toLowerCase(Locale.ROOT);
+        if (tl.equals("/stop")) { stopNow(); tgSend(token, chat, "Stopped."); return; }
+        if (tl.equals("/start") || tl.equals("/help")) {
+            tgSend(token, chat, "Try: open Settings, search cats on YouTube, tap X, type hi, scroll down, back, home, /screen, /stop. Plain words work if an AI is saved in the app.");
+            return;
+        }
+        if (tl.equals("/screen")) {
+            if (blocked()) { tgSend(token, chat, "I will not read this screen (password or money app)."); return; }
+            readScreen();
+            JSONArray a = new JSONArray(lastScreen);
+            StringBuilder b = new StringBuilder();
+            for (int i = 0; i < a.length() && i < 40; i++) b.append(a.getJSONObject(i).optString("text")).append('\n');
+            tgSend(token, chat, b.length() == 0 ? "Nothing readable." : b.toString());
+            return;
+        }
+        if (running) { tgSend(token, chat, "I am busy. Send /stop first."); return; }
+        JSONArray steps = parseCmd(text);
+        boolean ok;
+        if (steps != null && steps.length() > 0) {
+            ok = runPlan(steps.toString());
+        } else {
+            String base = sp.getString("base", ""), key = sp.getString("key", ""), model = sp.getString("model", "");
+            if (base.isEmpty() || key.isEmpty() || model.isEmpty()) {
+                tgSend(token, chat, "I do not understand that. Save an AI in the app for plain words.");
+                return;
+            }
+            ok = runAgent(text, base, key, model);
+        }
+        if (!ok) return;
+        for (int i = 0; i < 240 && running; i++) Thread.sleep(500);
+        tgSend(token, chat, summary());
+    }
+
+    private void botLoop(int g) {
+        long offset = 0;
+        while (botOn && g == botGen) {
+            try {
+                String token = getSharedPreferences("roohu", MODE_PRIVATE).getString("token", "");
+                JSONArray u = new JSONObject(http("GET", "https://api.telegram.org/bot" + token + "/getUpdates?timeout=25&offset=" + offset, null)).getJSONArray("result");
+                for (int i = 0; i < u.length(); i++) {
+                    JSONObject up = u.getJSONObject(i);
+                    offset = up.getLong("update_id") + 1;
+                    JSONObject m = up.optJSONObject("message");
+                    if (m == null) continue;
+                    botHandle(token, m.getJSONObject("chat").getLong("id"), m.optString("text", "").trim());
+                }
+            } catch (Exception e) {
+                try { Thread.sleep(5000); } catch (InterruptedException ie) { return; }
+            }
+        }
+    }
+
+    private synchronized void launchBot() {
+        final int g = ++botGen;
+        botOn = true;
+        new Thread(() -> botLoop(g)).start();
+    }
+
+    public void startBot(String token, String code, String base, String key, String model) {
+        getSharedPreferences("roohu", MODE_PRIVATE).edit().putString("token", token).putString("code", code).putLong("paired", 0)
+                .putString("base", base).putString("key", key).putString("model", model).putBoolean("bot", true).apply();
+        launchBot();
+    }
+
+    public void stopBot() {
+        botOn = false;
+        botGen++;
+        getSharedPreferences("roohu", MODE_PRIVATE).edit().putBoolean("bot", false).apply();
     }
 }

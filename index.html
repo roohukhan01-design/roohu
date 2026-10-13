@@ -74,11 +74,17 @@ label{font-size:13px;color:var(--mu)}
 <p id="am2" class="sm" style="color:var(--c)"></p>
 <label style="display:flex;gap:10px;align-items:flex-start;color:var(--tx)"><input type="checkbox" id="sa" style="margin-top:5px"><span>Screen-aware mode<br><span class="mu xs">Roohu looks at the words on your screen and decides each step. The visible screen text is sent to your AI provider. Off by default.</span></span></label>
 <p class="mu xs">Your key stays on this phone. Free plans have limits and model names change.</p></div>
+<div class="cd"><h3>Telegram control</h3>
+<p class="mu sm">Make a bot with @BotFather and paste its token. Tap Start, then send the pairing message to your bot. Only your paired chat can control this phone.</p>
+<label for="tt">Bot token</label><input id="tt" type="password" autocomplete="off" placeholder="123456:ABC...">
+<div class="row"><button class="btn g" id="tb">Start bot</button><button class="btn g" id="tp2">Stop bot</button></div>
+<p id="tn" class="sm" style="color:var(--c)"></p><p id="bs" class="mu xs"></p>
+<p class="mu xs">The phone must be on and unlocked. Keep the token private. It is stored on this phone. Roohu still refuses password and money screens.</p></div>
 <div class="cd"><h3>Routines</h3><p class="mu sm">Save a name for a set of commands. Say the name to run it.</p>
 <input id="rn" placeholder="Name, like morning" autocapitalize="off"><textarea id="rc" rows="2" placeholder="open Chrome, then wait 3, then scroll down"></textarea>
 <button class="btn g" id="rs" style="width:100%">Save routine</button><div id="rl"></div></div>
 <div class="cd"><label style="display:flex;gap:10px;align-items:center;color:var(--tx)"><input type="checkbox" id="sn"> Soft sounds</label></div>
-<div class="xs mu" style="padding:6px 2px 0"><b style="color:var(--tx)">About Roohu</b> · Version 1.3.0 · Developer: Roohu · Support: roohukhan01@gmail.com
+<div class="xs mu" style="padding:6px 2px 0"><b style="color:var(--tx)">About Roohu</b> · Version 1.4.1 · Developer: Roohu · Support: roohukhan01@gmail.com
 <br>Privacy: Commands run on your phone. If you use a cloud AI, the text you write (and the screen text, if screen-aware mode is on) goes to that provider.
 <div class="row" style="margin-top:10px"><a class="btn g" href="mailto:roohukhan01@gmail.com">Contact support</a><button class="btn g" id="cp">Copy email</button></div>
 <div style="margin-top:12px">© 2026 Roohu. All rights reserved.</div></div></div></div>
@@ -90,9 +96,14 @@ const ld=k=>{try{return localStorage.getItem(k)}catch(e){return null}};
 function parseCommand(text){
   const parts=text.split(/\s*(?:,\s*)?\b(?:and then|then)\b\s*|\s*[;\n]\s*/i).map(s=>s.trim().replace(/^[,\s]+|[,.\s]+$/g,'')).filter(Boolean);
   const steps=[];const q=s=>s.replace(/^["'“”‘’]+|["'“”‘’]+$/g,'').trim();
+  const S=(app,x)=>[...(app?[{a:'open',t:q(app)},{a:'wait',t:'3'}]:[]),{a:'tap',t:'search'},{a:'wait',t:'1'},{a:'type',t:q(x)},{a:'enter',t:''}];
   for(const p of parts){let m;
-    if(m=p.match(/^(?:open|launch|start)\s+(.+)$/i))steps.push({a:'open',t:q(m[1])});
+    if(m=p.match(/^(?:open|launch|start)\s+(.+?)\s+(?:and\s+)?(?:search|find)(?:\s+for)?\s+(.+)$/i))steps.push(...S(m[1],m[2]));
+    else if(m=p.match(/^(?:search|find)(?:\s+for)?\s+(.+?)\s+(?:in|on)\s+(.+)$/i))steps.push(...S(m[2],m[1]));
+    else if(m=p.match(/^(?:search|find)(?:\s+for)?\s+(.+)$/i))steps.push(...S(null,m[1]));
+    else if(m=p.match(/^(?:open|launch|start)\s+(.+)$/i))steps.push({a:'open',t:q(m[1])});
     else if(m=p.match(/^(?:tap|click|press|touch|select)\s+(?:on\s+)?(.+)$/i))steps.push({a:'tap',t:q(m[1])});
+    else if(/^(?:press\s+)?enter$/i.test(p))steps.push({a:'enter',t:''});
     else if(m=p.match(/^(?:type|write|enter)\s+(.+)$/i))steps.push({a:'type',t:q(m[1])});
     else if(m=p.match(/^scroll(?:\s+(up|down))?$/i))steps.push({a:'scroll',t:(m[1]||'down').toLowerCase()});
     else if(/^(?:go\s+)?back$/i.test(p))steps.push({a:'back',t:''});
@@ -108,43 +119,53 @@ function parseCommand(text){
 }
 function cleanPlan(raw){
   const s=String(raw).replace(/```json|```/gi,'');const i=s.indexOf('{'),k=s.lastIndexOf('}');
-  if(i<0||k<i)return {err:'The AI did not return steps.'};
+  if(i<0||k<i)return s.trim()?{say:s.trim().slice(0,400)}:{err:'The AI did not return steps.'};
   let o;try{o=JSON.parse(s.slice(i,k+1))}catch(e){return {err:'The AI answer was not valid.'}}
-  const A=['open','tap','type','scroll','back','home','wait','read'];
+  const A=['open','tap','type','scroll','back','home','enter','wait','read'];
   const steps=(Array.isArray(o.steps)?o.steps:[]).slice(0,20).filter(x=>x&&A.includes(x.a)).map(x=>{
     let t=String(x.t==null?'':x.t).slice(0,80);
     if(x.a=='scroll')t=t=='up'?'up':'down';
     if(x.a=='wait')t=String(Math.min(10,Math.max(1,parseInt(t)||2)));
-    if(['back','home','read'].includes(x.a))t='';
+    if(['back','home','read','enter'].includes(x.a))t='';
     return {a:x.a,t}}).filter(x=>!['open','tap','type'].includes(x.a)||x.t);
-  if(!steps.length)return {err:'The AI gave no usable steps.'};
+  if(!steps.length)return o.say?{say:String(o.say).slice(0,400)}:{err:'The AI gave no usable steps.'};
   if(!['open','home','wait'].includes(steps[0].a))steps.unshift({a:'wait',t:'5'});
   return {steps};
 }
-function sayStep(s){const t=s.t;return({open:'Opening '+t,tap:'Tapping '+t,type:'Typing "'+t+'"',scroll:'Scrolling '+t,back:'Going back',home:'Going home',read:'Reading the screen',wait:'Waiting '+t+' seconds'})[s.a]||s.a}
+function sayStep(s){const t=s.t;return({open:'Opening '+t,tap:'Tapping '+t,type:'Typing "'+t+'"',scroll:'Scrolling '+t,back:'Going back',home:'Going home',read:'Reading the screen',enter:'Pressing enter',wait:'Waiting '+t+' seconds'})[s.a]||s.a}
+function localReply(t,c){
+  const s=t.trim().toLowerCase().replace(/[’]/g,"'").replace(/[?!.]+$/,'');const m=c&&c.model?c.model:null;
+  if(/^(?:hi|hello|hey|yo|salam|good (?:morning|evening|afternoon))$/.test(s))return 'Hello. I am Roohu. Tell me what to do on your phone.';
+  if(/^(?:who(?:'s| is| are)|what(?:'s| is| are))\s+(?:you|roohu|this)$/.test(s)||/^(?:tell me )?about (?:you|yourself|roohu)$/.test(s))return 'I am Roohu. I work your phone for you: I open apps, tap, type and search. '+(m?'My brain is the model "'+m+'".':'I have no AI brain yet, so I only know simple commands.');
+  if(/(?:which|what)\s+(?:model|ai|llm|brain)/.test(s))return m?'My brain is the model "'+m+'". It runs on the provider you chose in Settings.':'I have no AI brain yet. Add a free one in Settings.';
+  if(/^(?:what can you do|help|commands)$/.test(s))return 'I can open apps, tap, type, scroll and search. Try: open Play Store and search subway surfers. With an AI brain I understand plain words. You can also control me from Telegram.';
+  return null;
+}
 function findRoutine(R,t){const k=Object.keys(R).find(n=>n.toLowerCase()==t.trim().toLowerCase());return k?R[k]:null}
 //</P>
-const SYS='You control an Android phone with simple steps. Answer with JSON only, no other text: {"steps":[{"a":"open","t":"App name"}]}. Allowed a: open (t = app name), tap (t = visible button text), type (t = text), scroll (t = up or down), back, home, wait (t = seconds), read. Use at most 12 steps. Use common English button names. Never use banking, payment or password apps. If the task is not possible, return {"steps":[]}.';
+const ME='You are Roohu, a friendly assistant that works an Android phone. Your name is Roohu, never "Assistant". Keep answers short and simple. ';
+const SYSR=ME+'If the user asks a question or chats, answer with JSON only: {"say":"your short answer"}. If the user wants something done on the phone, answer with JSON only: {"task":true}.';
+const SYS=ME+'If the user only asks a question or chats, answer with JSON only: {"say":"your short answer"}. Otherwise you control an Android phone with simple steps. Answer with JSON only, no other text: {"steps":[{"a":"open","t":"App name"}]}. Allowed a: open (t = app name), tap (t = visible button text), type (t = text), scroll (t = up or down), back, home, enter (press enter), wait (t = seconds), read. Use at most 12 steps. Use common English button names. Never use banking, payment or password apps. If the task is not possible, return {"steps":[]}.';
 const PV={or:['https://openrouter.ai/api/v1',''],gr:['https://api.groq.com/openai/v1','llama-3.3-70b-versatile'],ge:['https://generativelanguage.googleapis.com/v1beta/openai','gemini-2.5-flash'],cu:['','']};
 function cfg(){try{return JSON.parse(ld('ai')||'{}')}catch(e){return {}}}
-async function ask(c,user){
+async function ask(c,user,sys){
   const ac=new AbortController();const to=setTimeout(()=>ac.abort(),30000);
   try{const r=await fetch(c.base.replace(/\/$/,'')+'/chat/completions',{method:'POST',signal:ac.signal,headers:{'Content-Type':'application/json','Authorization':'Bearer '+c.key},
-    body:JSON.stringify({model:c.model,temperature:0,max_tokens:500,messages:[{role:'system',content:SYS},{role:'user',content:user}]})});
+    body:JSON.stringify({model:c.model,temperature:0,max_tokens:500,messages:[{role:'system',content:sys||SYS},{role:'user',content:user}]})});
     const j=await r.json().catch(()=>({}));
     if(!r.ok)throw new Error(String((j.error&&(j.error.message||j.error))||'HTTP '+r.status).slice(0,140));
     return (j.choices&&j.choices[0]&&j.choices[0].message.content)||''}
   finally{clearTimeout(to)}
 }
 function mock(){const st={running:false,log:[],screen:[{text:'Wi-Fi'},{text:'Bluetooth'},{text:'Search settings'}]};
-return{isEnabled:async()=>({enabled:true}),openSettings:async()=>{},stop:async()=>{st.running=false;st.log.push('Stopped.')},
+return{speak:async()=>{},shutUp:async()=>{},botStart:async()=>{},botStop:async()=>{},isEnabled:async()=>({enabled:true}),openSettings:async()=>{},stop:async()=>{st.running=false;st.log.push('Stopped.')},
 status:async()=>({status:JSON.stringify(st)}),
 run:async({plan})=>{const s=JSON.parse(plan);st.running=true;st.log=[];let i=0;
 const nx=()=>{if(!st.running)return;if(i<s.length){st.log.push((i+1)+'. '+s[i].a+' '+s[i].t,'   ok');if(s[i].a=='read')st.log.push('   ok, saw 3 items');i++;setTimeout(nx,800)}else{st.log.push('Finished.');st.running=false}};nx()}}}
 let Agent=null,tm,seen=0,first=true,state='idle',said=false,kick=0;
 try{const C=window.Capacitor;
 if(C&&typeof C.registerPlugin==='function'&&C.isNativePlatform&&C.isNativePlatform())Agent=C.registerPlugin('Agent');
-else if(C&&typeof C.nativePromise==='function'){Agent={};['isEnabled','openSettings','run','runAgent','status','stop'].forEach(m=>{Agent[m]=o=>C.nativePromise('Agent',m,o||{})})}
+else if(C&&typeof C.nativePromise==='function'){Agent={};['isEnabled','openSettings','run','runAgent','status','stop','speak','shutUp','botStart','botStop'].forEach(m=>{Agent[m]=o=>C.nativePromise('Agent',m,o||{})})}
 }catch(e){}
 const preview=!Agent;if(preview)Agent=mock();
 const mk=(tag,cls,txt)=>{const e=document.createElement(tag);if(cls)e.className=cls;e.textContent=txt;return e};
@@ -152,8 +173,10 @@ const LB={idle:'STANDING BY',think:'THINKING',act:'WORKING',speak:'SPEAKING',err
 function setState(s){state=s;$('#stt').textContent=LB[s]}
 let voice=ld('voice')!=='0';
 const syncV=()=>$('#vb').classList.toggle('off',!voice);
-function speak(t){if(!voice||!window.speechSynthesis)return;try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.onstart=()=>{if(state=='idle')setState('speak')};u.onend=()=>{if(state=='speak')setState('idle')};speechSynthesis.speak(u)}catch(e){}}
-let AC=null;function beep(f){if(ld('sound')!=='1')return;try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();const o=AC.createOscillator(),g=AC.createGain();o.frequency.value=f;g.gain.value=.04;o.connect(g);g.connect(AC.destination);o.start();g.gain.exponentialRampToValueAtTime(.0001,AC.currentTime+.18);o.stop(AC.currentTime+.2)}catch(e){}}
+function speak(t){if(!voice)return;
+  if(!preview){try{Promise.resolve(Agent.speak({text:t})).catch(()=>{})}catch(e){}setState('speak');setTimeout(()=>{if(state=='speak')setState('idle')},Math.min(8000,t.length*65));return}
+  if(!window.speechSynthesis)return;try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.onstart=()=>{if(state=='idle')setState('speak')};u.onend=()=>{if(state=='speak')setState('idle')};speechSynthesis.speak(u)}catch(e){}}
+let AC=null;function beep(f){if(ld('sound')==='0')return;try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();const o=AC.createOscillator(),g=AC.createGain();o.frequency.value=f;g.gain.value=.04;o.connect(g);g.connect(AC.destination);o.start();g.gain.exponentialRampToValueAtTime(.0001,AC.currentTime+.18);o.stop(AC.currentTime+.2)}catch(e){}}
 const sc=()=>{const c=$('#chat');c.scrollTop=c.scrollHeight};
 function msg(r,t,o={}){const c=$('#chat');while(c.children.length>40)c.firstChild.remove();
   const m=mk('div','m '+r,'');const b=mk('span','','');m.append(b);c.append(m);
@@ -169,7 +192,7 @@ function narr(l,r){let m;
   else if(l=='Stopped.')msg('a','Stopped.');
   else if(l.startsWith('STOPPED'))msg('a','I stopped. This looks like a password or money screen.');
   else if(l.startsWith('Not allowed'))msg('a','Okay, I did not do it.')}
-async function poll(){clearTimeout(tm);try{const r=JSON.parse((await Agent.status()).status);const L=r.log||[];
+async function poll(){clearTimeout(tm);try{const r=JSON.parse((await Agent.status()).status);const L=r.log||[];$('#bs').textContent=r.bot?(r.paired?'Bot is running and paired.':'Bot is running. Waiting for your pairing message.'):'Bot is off.';
   if(first){seen=L.length;first=false}if(L.length<seen)seen=0;
   for(;seen<L.length;seen++)narr(L[seen],r);
   if(r.running){setState('act');tm=setTimeout(poll,700)}else if(state=='act'||state=='err')setState('idle');
@@ -186,10 +209,13 @@ const rt=()=>{try{return JSON.parse(ld('rt')||'{}')}catch(e){return{}}};
 async function submit(t,depth){t=(t||$('#cmd').value).trim();if(!t)return;$('#cmd').value='';if(!depth)msg('u',t);beep(660);
   const rc=findRoutine(rt(),t);if(rc&&!depth&&rc!==t)return submit(rc,1);
   const p=parseCommand(t);if(!p.err)return exec(p.steps);
-  const c=cfg();if(!c.key||!c.model||!c.base)return msg('a','I only know exact commands for now, like "open Chrome, then scroll down". Add a brain in settings (✦) and I will understand plain words.');
-  if(ld('sa')==='1'&&!preview)return begin(()=>Agent.runAgent({goal:t,base:c.base,key:c.key,model:c.model}),'On it.');
+  const lr=localReply(t,cfg());if(lr)return msg('a',lr);
+  const c=cfg();if(!c.key||!c.model||!c.base)return msg('a','I only know simple commands, like "open Play Store and search subway surfers". For plain words, add a free AI brain.',{btns:[['Add a brain',()=>{$('#set').classList.add('on');poll()}]]});
+  if(ld('sa')==='1'&&!preview){setState('think');
+    try{const r=cleanPlan(await ask(c,t,SYSR));setState('idle');if(r.say)return msg('a',r.say)}catch(e){setState('err');return msg('a','I could not reach the AI: '+(e.name=='AbortError'?'it took too long':(e.message||e)))}
+    return begin(()=>Agent.runAgent({goal:t,base:c.base,key:c.key,model:c.model}),'On it.')}
   setState('think');
-  try{const q=cleanPlan(await ask(c,t));setState('idle');if(q.err)return msg('a',q.err);
+  try{const q=cleanPlan(await ask(c,t));setState('idle');if(q.say)return msg('a',q.say);if(q.err)return msg('a',q.err);
     msg('a','My plan: '+q.steps.filter(s=>s.a!='wait').map(sayStep).join(', then ').toLowerCase()+'.',{btns:[['Run it',()=>exec(q.steps)],['Cancel',()=>msg('a','Cancelled.')]]})}
   catch(e){setState('err');msg('a','I could not reach the AI: '+(e.name=='AbortError'?'it took too long':(e.message||e)))}}
 function drawR(){const R=rt(),n=Object.keys(R);const L=$('#rl'),P=$('#rts');L.textContent='';P.textContent='';
@@ -201,10 +227,10 @@ $('#go').onclick=()=>submit();
 $('#cmd').addEventListener('keydown',e=>{if(e.key=='Enter'){e.preventDefault();submit()}});
 $('#cmd').addEventListener('input',()=>{kick=1});
 $('#stop').onclick=async()=>{await Agent.stop();poll()};
-$('#vb').onclick=()=>{voice=!voice;sv('voice',voice?'1':'0');syncV();if(!voice&&window.speechSynthesis)speechSynthesis.cancel()};syncV();
-$('#sb').onclick=()=>$('#set').classList.add('on');$('#x').onclick=()=>$('#set').classList.remove('on');
+$('#vb').onclick=()=>{voice=!voice;sv('voice',voice?'1':'0');syncV();if(voice)speak('Voice is on.');else{try{Agent.shutUp()}catch(e){}if(window.speechSynthesis)speechSynthesis.cancel()}};syncV();
+$('#sb').onclick=()=>{$('#set').classList.add('on');poll()};$('#x').onclick=()=>$('#set').classList.remove('on');
 $('#cp').onclick=async()=>{try{await navigator.clipboard.writeText('roohukhan01@gmail.com');$('#cp').textContent='Copied'}catch(e){$('#cp').textContent='Copy failed'}};
-$('#sn').checked=ld('sound')==='1';$('#sn').onchange=()=>{sv('sound',$('#sn').checked?'1':'0');beep(700)};
+$('#sn').checked=ld('sound')!=='0';$('#sn').onchange=()=>{sv('sound',$('#sn').checked?'1':'0');beep(700)};
 $('#sa').checked=ld('sa')==='1';$('#sa').onchange=()=>sv('sa',$('#sa').checked?'1':'0');
 const note=t=>{$('#am2').textContent=t};
 (function(){const c=cfg();$('#ap').value=c.p||'or';$('#ab').value=c.base||PV[c.p||'or'][0];$('#ak').value=c.key||'';$('#am').value=c.model||''})();
@@ -218,6 +244,11 @@ $('#aL').onclick=async()=>{note('Loading…');try{const r=await fetch('https://o
   catch(e){note('Could not load: '+(e.message||e))}};
 $('#aT').onclick=async()=>{const c=cur();if(!c.key||!c.model||!c.base)return note('Fill base URL, key and model first.');note('Testing…');
   try{const q=cleanPlan(await ask(c,'open Settings'));note(q.err?'Connected, but: '+q.err:'Works. The AI answered with a plan.')}catch(e){note('Failed: '+(e.name=='AbortError'?'too slow':(e.message||e)))}};
+const tn=t=>{$('#tn').textContent=t};$('#tt').value=ld('tg')||'';
+$('#tb').onclick=async()=>{const tok=$('#tt').value.trim();if(!tok)return tn('Paste the bot token first.');sv('tg',tok);
+  const code=String(crypto.getRandomValues(new Uint32Array(1))[0]%900000+100000),c=cfg();
+  try{await Agent.botStart({token:tok,code,base:c.base||'',key:c.key||'',model:c.model||''});tn('Running. Send this to your bot: /pair '+code);poll()}catch(e){tn('Could not start: '+(e.message||e)+'. Is the service on?')}};
+$('#tp2').onclick=async()=>{try{await Agent.botStop();tn('Bot stopped.');poll()}catch(e){}};
 /* orb */
 const cv=$('#orb'),g=cv.getContext('2d'),R0=window.devicePixelRatio||1;let D=300;
 function fit(){D=Math.max(200,Math.min(380,innerWidth*.92,innerHeight*.42));cv.style.width=cv.style.height=D+'px';cv.width=cv.height=D*R0}
